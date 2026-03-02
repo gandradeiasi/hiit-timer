@@ -143,16 +143,22 @@
 
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         
-        function playBeep(frequency, duration) {
+        function playBeep(frequency, duration, type = 'square') {
             try {
                 const oscillator = audioCtx.createOscillator();
                 const gainNode = audioCtx.createGain();
-                oscillator.type = 'sine';
+                
+                // 'square' ou 'sawtooth' são muito mais fáceis de ouvir sobre música do que 'sine'
+                oscillator.type = type;
                 oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
-                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                
+                // Aumentando o ganho para ser mais audível
+                gainNode.gain.setValueAtTime(0.6, audioCtx.currentTime);
                 gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+                
                 oscillator.connect(gainNode);
                 gainNode.connect(audioCtx.destination);
+                
                 oscillator.start();
                 oscillator.stop(audioCtx.currentTime + duration);
             } catch(e) {}
@@ -215,7 +221,6 @@
         }
 
         function startSprint() {
-            // Permitimos iniciar se vier de IDLE, REST ou se estivermos saindo de COUNTDOWN
             if (state === 'COUNTDOWN') return; 
 
             state = 'SPRINT';
@@ -268,17 +273,17 @@
             
             for (let i = 3; i > 0; i--) {
                 countdownNumber.textContent = i;
-                playBeep(440, 0.15); 
-                vibrate(200);
+                // Tom agressivo para a contagem
+                playBeep(660, 0.2, 'square'); 
+                vibrate(150);
                 await new Promise(r => setTimeout(r, 1000));
             }
             
             countdownOverlay.classList.add('hidden');
-            playBeep(880, 0.4); 
-            vibrate([400, 100, 400]);
+            // Tom mais alto e mais longo para o "GO"
+            playBeep(1200, 0.5, 'square'); 
+            vibrate([500, 100, 500]);
             
-            // Forçamos a mudança de estado para IDLE momentaneamente 
-            // para que startSprint() passe pelo guarda de segurança
             state = 'IDLE'; 
             startSprint();
         }
