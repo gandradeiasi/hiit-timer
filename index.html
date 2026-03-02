@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor HIIT Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            touch-action: manipulation;
+            user-select: none;
+        }
+        .timer-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .pulse-sprint {
+            animation: pulse-red 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse-red {
+            0%, 100% { opacity: 1; text-shadow: 0 0 20px rgba(249,115,22,0.5); }
+            50% { opacity: .8; text-shadow: 0 0 5px rgba(249,115,22,0.2); }
+        }
+        .progress-transition {
+            transition: width 0.1s linear;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-between p-6">
+
+    <!-- Configurações -->
+    <div class="w-full max-w-md bg-slate-800/50 p-4 rounded-2xl border border-slate-700">
+        <div class="flex justify-between items-center mb-4">
+            <h1 class="text-xl font-bold flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-orange-500"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/><path d="M9 12h.01"/><path d="M15 12h.01"/><path d="M12 12h.01"/></svg>
+                HIIT Monitor
+            </h1>
+            <button id="settingsBtn" class="p-2 hover:bg-slate-700 rounded-full transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+        </div>
+
+        <div id="settingsPanel" class="hidden space-y-4 pt-2 border-t border-slate-700">
+            <div>
+                <label class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Meta de Sprint (minutos)</label>
+                <input type="number" id="targetInput" value="10" step="1" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 mt-1 focus:ring-2 focus:ring-orange-500 outline-none">
+            </div>
+            <div>
+                <label class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Razão de Descanso (x Sprint)</label>
+                <input type="number" id="ratioInput" value="2.5" step="0.1" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 mt-1 focus:ring-2 focus:ring-orange-500 outline-none">
+            </div>
+            <button id="saveSettings" class="w-full bg-orange-600 hover:bg-orange-500 font-bold py-2 rounded-lg transition-colors">Salvar Configurações</button>
+        </div>
+    </div>
+
+    <!-- Display Principal -->
+    <div class="flex flex-col items-center justify-center flex-grow py-8 w-full max-w-md text-center">
+        <div id="statusLabel" class="text-xl font-bold tracking-[0.2em] uppercase text-slate-400 mb-2 transition-all">Pronto</div>
+        
+        <div id="mainTimer" class="timer-font text-8xl font-extrabold tabular-nums leading-none mb-4">
+            00:00
+        </div>
+
+        <!-- Barra de Progresso do Descanso (Limite) -->
+        <div id="restProgressContainer" class="w-full h-3 bg-slate-800 rounded-full overflow-hidden mb-2 opacity-0 transition-opacity">
+            <div id="restProgressBar" class="h-full bg-blue-500 progress-transition w-0"></div>
+        </div>
+
+        <div id="restLimitInfo" class="text-xs uppercase tracking-widest text-slate-500 mb-8 hidden">
+            Tempo Limite: <span id="maxRestValue" class="text-blue-400 font-bold">0s</span>
+        </div>
+    </div>
+
+    <!-- Progresso Acumulado -->
+    <div class="w-full max-w-md mb-8">
+        <div class="flex justify-between text-xs font-bold text-slate-500 uppercase mb-2">
+            <span>Sprint Total Acumulado</span>
+            <span id="totalSprintDisplay">00:00 / 10:00</span>
+        </div>
+        <div class="w-full h-4 bg-slate-900 rounded-full overflow-hidden border border-slate-700 p-0.5">
+            <div id="totalProgressBar" class="h-full bg-orange-500 progress-transition w-0 rounded-full"></div>
+        </div>
+    </div>
+
+    <!-- Controles -->
+    <div class="w-full max-w-md grid grid-cols-1 gap-4">
+        <button id="mainControlBtn" class="group relative flex items-center justify-center bg-orange-600 hover:bg-orange-500 h-28 rounded-3xl transition-all active:scale-95 shadow-xl">
+            <div id="playIcon" class="flex flex-col items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                <span class="text-xs font-black uppercase tracking-widest mt-1">Iniciar Sprint</span>
+            </div>
+            <div id="pauseIcon" class="hidden flex flex-col items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                <span class="text-xs font-black uppercase tracking-widest mt-1">Descansar Agora</span>
+            </div>
+        </button>
+
+        <button id="resetBtn" class="py-2 text-slate-500 hover:text-white font-semibold uppercase tracking-widest text-xs">
+            Zerar Tudo
+        </button>
+    </div>
+
+    <!-- Overlay de Contagem Regressiva -->
+    <div id="countdownOverlay" class="fixed inset-0 bg-slate-900/98 flex items-center justify-center z-50 hidden">
+        <div id="countdownNumber" class="text-[18rem] font-black italic timer-font text-orange-500">3</div>
+    </div>
+
+    <script>
+        let state = 'IDLE'; 
+        let totalSprintSeconds = 0;
+        let currentIntervalSeconds = 0;
+        let lastSprintDuration = 0;
+        
+        let targetSprintMinutes = 10;
+        let restRatio = 2.5;
+
+        let timerInterval = null;
+        let wakeLock = null;
+
+        const mainTimer = document.getElementById('mainTimer');
+        const statusLabel = document.getElementById('statusLabel');
+        const mainControlBtn = document.getElementById('mainControlBtn');
+        const playIcon = document.getElementById('playIcon');
+        const pauseIcon = document.getElementById('pauseIcon');
+        const restProgressContainer = document.getElementById('restProgressContainer');
+        const restProgressBar = document.getElementById('restProgressBar');
+        const restLimitInfo = document.getElementById('restLimitInfo');
+        const maxRestValue = document.getElementById('maxRestValue');
+        const totalSprintDisplay = document.getElementById('totalSprintDisplay');
+        const totalProgressBar = document.getElementById('totalProgressBar');
+        const countdownOverlay = document.getElementById('countdownOverlay');
+        const countdownNumber = document.getElementById('countdownNumber');
+        const settingsBtn = document.getElementById('settingsBtn');
+        const settingsPanel = document.getElementById('settingsPanel');
+        const targetInput = document.getElementById('targetInput');
+        const ratioInput = document.getElementById('ratioInput');
+        const saveSettings = document.getElementById('saveSettings');
+        const resetBtn = document.getElementById('resetBtn');
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playBeep(frequency, duration) {
+            try {
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + duration);
+            } catch(e) {}
+        }
+
+        function vibrate(pattern) {
+            if ("vibrate" in navigator) navigator.vibrate(pattern);
+        }
+
+        async function requestWakeLock() {
+            if (!('wakeLock' in navigator)) return;
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+            } catch (err) {}
+        }
+
+        function formatTime(seconds) {
+            const s = Math.floor(seconds);
+            const mins = Math.floor(s / 60);
+            const secs = s % 60;
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function updateUI() {
+            const totalTarget = targetSprintMinutes * 60;
+            const totalProgress = Math.min((totalSprintSeconds / totalTarget) * 100, 100);
+            totalProgressBar.style.width = `${totalProgress}%`;
+            totalSprintDisplay.textContent = `${formatTime(totalSprintSeconds)} / ${formatTime(totalTarget)}`;
+
+            if (state === 'SPRINT') {
+                mainTimer.textContent = formatTime(currentIntervalSeconds);
+                statusLabel.textContent = "Sprint Ativo";
+                statusLabel.className = "text-xl font-bold tracking-[0.2em] uppercase text-orange-500 pulse-sprint";
+                playIcon.classList.add('hidden');
+                pauseIcon.classList.remove('hidden');
+                restProgressContainer.classList.add('opacity-0');
+                restLimitInfo.classList.add('hidden');
+            } else if (state === 'REST') {
+                mainTimer.textContent = formatTime(currentIntervalSeconds);
+                statusLabel.textContent = "Descanso";
+                statusLabel.className = "text-xl font-bold tracking-[0.2em] uppercase text-blue-400";
+                playIcon.classList.remove('hidden');
+                pauseIcon.classList.add('hidden');
+                restProgressContainer.classList.remove('opacity-0');
+                
+                const maxRest = lastSprintDuration * restRatio;
+                const progress = (currentIntervalSeconds / maxRest) * 100;
+                restProgressBar.style.width = `${Math.min(progress, 100)}%`;
+                
+                restLimitInfo.classList.remove('hidden');
+                maxRestValue.textContent = `${maxRest.toFixed(1)}s`;
+            } else if (state === 'IDLE') {
+                mainTimer.textContent = "00:00";
+                statusLabel.textContent = "Pronto";
+                statusLabel.className = "text-xl font-bold tracking-[0.2em] uppercase text-slate-400";
+                playIcon.classList.remove('hidden');
+                pauseIcon.classList.add('hidden');
+                restProgressContainer.classList.add('opacity-0');
+            }
+        }
+
+        function startSprint() {
+            // Permitimos iniciar se vier de IDLE, REST ou se estivermos saindo de COUNTDOWN
+            if (state === 'COUNTDOWN') return; 
+
+            state = 'SPRINT';
+            currentIntervalSeconds = 0;
+            requestWakeLock();
+            updateUI();
+            
+            clearInterval(timerInterval);
+            let lastTime = Date.now();
+            
+            timerInterval = setInterval(() => {
+                const now = Date.now();
+                const delta = (now - lastTime) / 1000;
+                lastTime = now;
+                
+                currentIntervalSeconds += delta;
+                totalSprintSeconds += delta;
+                updateUI();
+            }, 100);
+        }
+
+        function startRest() {
+            lastSprintDuration = currentIntervalSeconds;
+            state = 'REST';
+            currentIntervalSeconds = 0;
+            updateUI();
+            
+            clearInterval(timerInterval);
+            let lastTime = Date.now();
+            const maxRest = lastSprintDuration * restRatio;
+
+            timerInterval = setInterval(() => {
+                const now = Date.now();
+                const delta = (now - lastTime) / 1000;
+                lastTime = now;
+
+                currentIntervalSeconds += delta;
+                
+                if (currentIntervalSeconds >= maxRest) {
+                    clearInterval(timerInterval);
+                    triggerAutoCountdown();
+                }
+                updateUI();
+            }, 100);
+        }
+
+        async function triggerAutoCountdown() {
+            state = 'COUNTDOWN';
+            countdownOverlay.classList.remove('hidden');
+            
+            for (let i = 3; i > 0; i--) {
+                countdownNumber.textContent = i;
+                playBeep(440, 0.15); 
+                vibrate(200);
+                await new Promise(r => setTimeout(r, 1000));
+            }
+            
+            countdownOverlay.classList.add('hidden');
+            playBeep(880, 0.4); 
+            vibrate([400, 100, 400]);
+            
+            // Forçamos a mudança de estado para IDLE momentaneamente 
+            // para que startSprint() passe pelo guarda de segurança
+            state = 'IDLE'; 
+            startSprint();
+        }
+
+        mainControlBtn.addEventListener('click', () => {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            if (state === 'IDLE') {
+                startSprint();
+            } else if (state === 'SPRINT') {
+                startRest();
+            } else if (state === 'REST') {
+                startSprint();
+            }
+        });
+
+        settingsBtn.addEventListener('click', () => {
+            settingsPanel.classList.toggle('hidden');
+        });
+
+        saveSettings.addEventListener('click', () => {
+            targetSprintMinutes = parseFloat(targetInput.value) || 10;
+            restRatio = parseFloat(ratioInput.value) || 2.5;
+            settingsPanel.classList.add('hidden');
+            updateUI();
+        });
+
+        resetBtn.addEventListener('click', () => {
+            if (confirm("Deseja zerar todo o progresso do treino?")) {
+                clearInterval(timerInterval);
+                state = 'IDLE';
+                totalSprintSeconds = 0;
+                currentIntervalSeconds = 0;
+                updateUI();
+            }
+        });
+
+        updateUI();
+
+        document.addEventListener('visibilitychange', () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') {
+                requestWakeLock();
+            }
+        });
+    </script>
+</body>
+</html>
